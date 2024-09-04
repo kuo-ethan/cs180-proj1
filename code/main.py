@@ -6,38 +6,40 @@
 import numpy as np
 import skimage as sk
 import skimage.io as skio
+import sys
+from lib import colorize_with_euclidean, colorize_with_ncc
 
-# name of the input file
-imname = '../data/cathedral.jpg'
+imname = None
+D = 15
 
-# read in the image
+# Parse user inputs
+if len(sys.argv) == 2:
+    imname = f'../data/{sys.argv[1]}.jpg'
+elif len(sys.argv) == 3:
+    imname = f'../data/{sys.argv[1]}.jpg'
+    D = int(sys.argv[2])
+else:
+    print("Error: You need to pass 1 or 2 arguments.")
+    print("Usage: python3 script_name.py <image_name> [displacement_factor]")
+    sys.exit(1)  # Exit the program with a non-zero exit code indicating an error
+
+# Read in the image and separate color channels (in grayscale)
 im = skio.imread(imname)
-
-# convert to double (might want to do this later on to save memory)    
 im = sk.img_as_float(im)
-    
-# compute the height of each part (just 1/3 of total)
 height = np.floor(im.shape[0] / 3.0).astype(int)
+b = im[:height]
+g = im[height: 2*height]
+r = im[2*height: 3*height]
 
-# separate color channels
-b = im[:height] * 255
-g = im[height: 2*height] * 255
-r = im[2*height: 3*height] * 255
+# Align the channels and create color images
+im_out_euclidean = colorize_with_euclidean(r, g, b, D).astype('uint8')
+im_out_ncc = colorize_with_ncc(r, g, b, D).astype('uint8')
 
-# align the images
-# functions that might be useful for aligning the images include:
-# np.roll, np.sum, sk.transform.rescale (for multiscale)
-
-### ag = align(g, b)
-### ar = align(r, b)
-# create a color image
-im_out = np.dstack([r, g, b])
-im_out = im_out.astype('uint8')
-
-# save the image
-fname = '../images/out_fname.jpg'
-skio.imsave(fname, im_out)
-
-# display the image
-skio.imshow(im_out)
+# Create, save, and display the color image
+fname_euclidean = f'../images/euclidean_{imname}.jpg'
+fname_ncc = f'../images/ncc_{imname}.jpg'
+skio.imsave(fname_euclidean, im_out_euclidean)
+skio.imsave(fname_ncc, im_out_ncc)
+skio.imshow(im_out_euclidean)
+skio.imshow(im_out_ncc)
 skio.show()
