@@ -8,7 +8,7 @@ import skimage as sk
 import skimage.io as skio
 
 # name of the input file
-imname = 'cathedral.jpg'
+imname = '../data/cathedral.jpg'
 
 # read in the image
 im = skio.imread(imname)
@@ -17,12 +17,12 @@ im = skio.imread(imname)
 im = sk.img_as_float(im)
     
 # compute the height of each part (just 1/3 of total)
-height = np.floor(im.shape[0] / 3.0).astype(np.int)
+height = np.floor(im.shape[0] / 3.0).astype(int)
 
 # separate color channels
-b = im[:height]
-g = im[height: 2*height]
-r = im[2*height: 3*height]
+b = im[:height] * 255
+g = im[height: 2*height] * 255
+r = im[2*height: 3*height] * 255
 
 # align the images
 # functions that might be useful for aligning the images include:
@@ -31,10 +31,11 @@ r = im[2*height: 3*height]
 ### ag = align(g, b)
 ### ar = align(r, b)
 # create a color image
-im_out = np.dstack([ar, ag, b])
+im_out = np.dstack([r, g, b])
+im_out = im_out.astype('uint8')
 
 # save the image
-fname = '/out_path/out_fname.jpg'
+fname = '../images/out_fname.jpg'
 skio.imsave(fname, im_out)
 
 # display the image
