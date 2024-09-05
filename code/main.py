@@ -7,25 +7,49 @@ import numpy as np
 import skimage as sk
 import skimage.io as skio
 import sys
-from lib import colorize_with_euclidean, colorize_with_ncc
+from lib import naive_colorize, pyramid_colorize
 
 imname = None
-D = 15
+D = None
+curr_extension = None
 
-# Parse user inputs
-if len(sys.argv) == 2:
-    imname = f'../data/{sys.argv[1]}.jpg'
-elif len(sys.argv) == 3:
-    imname = f'../data/{sys.argv[1]}.jpg'
-    D = int(sys.argv[2])
-else:
+extension = {
+    'cathedral': 'jpg',
+    'church': 'tif',
+    'emir': 'tif',
+    'harvesters': 'tif',
+    'icon': 'tif',
+    'lady': 'tif',
+    'melons': 'tif',
+    'monastery': 'jpg',
+    'onion_church': 'tif',
+    'sculpture': 'tif',
+    'self_portrait': 'tif',
+    'three_generations': 'tif',
+    'tobolsk': 'jpg',
+    'train': 'tif',
+}
+
+# Validate command line inputs
+if len(sys.argv) < 2 or len(sys.arv) > 3:
     print("Error: You need to pass 1 or 2 arguments.")
-    print("Usage: python3 script_name.py <image_name> [displacement_factor]")
-    sys.exit(1)  # Exit the program with a non-zero exit code indicating an error
+    print("Usage: python3 main.py <image_name> [displacement_factor]")
+    print("Example: python3 main.py cathedral.jpg 30")
+    sys.exit(1)
 
-# Read in the image and separate color channels (in grayscale)
+# Parse inputs
+curr_extension = extension[sys.argv[1]]
+imname = f'../data/{sys.argv[1]}.{curr_extension}'
+if len(sys.argv) == 2:
+    # Use default displacement search range
+    D = 16
+else:
+    D = int(sys.argv[2])
+
+# Read in the image (as a uint8) and separate color channels (in grayscale)
 im = skio.imread(imname)
-# im = sk.img_as_float(im)
+if (im.dtype == np.uint16):
+   im = (im / 256).astype(np.uint8)
 
 height = np.floor(im.shape[0] / 3.0).astype(int)
 b = im[:height]
@@ -33,14 +57,12 @@ g = im[height: 2*height]
 r = im[2*height: 3*height]
 
 # Align the channels and create color images
-im_out_euclidean = colorize_with_euclidean(r, g, b, D).astype('uint8')
-im_out_ncc = colorize_with_ncc(r, g, b, D).astype('uint8')
+im_out = None
+if curr_extension == 'jpg':
+    im_out = naive_colorize(r, g, b, D)
+else:
+    im_out = pyramid_colorize(r, g, b)
 
 # Create, save, and display the color image
-fname_euclidean = f'../images/euclidean_{sys.argv[1]}.jpg'
 fname_ncc = f'../images/ncc_{sys.argv[1]}.jpg'
-skio.imsave(fname_euclidean, im_out_euclidean)
-skio.imsave(fname_ncc, im_out_ncc)
-# skio.imshow(im_out_euclidean)
-# skio.imshow(im_out_ncc)
-# skio.show()
+skio.imsave(fname_ncc, im_out)
