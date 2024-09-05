@@ -25,7 +25,8 @@ else:
 
 # Read in the image and separate color channels (in grayscale)
 im = skio.imread(imname)
-im = sk.img_as_float(im)
+# im = sk.img_as_float(im)
+
 height = np.floor(im.shape[0] / 3.0).astype(int)
 b = im[:height]
 g = im[height: 2*height]
@@ -36,10 +37,10 @@ im_out_euclidean = colorize_with_euclidean(r, g, b, D).astype('uint8')
 im_out_ncc = colorize_with_ncc(r, g, b, D).astype('uint8')
 
 # Create, save, and display the color image
-fname_euclidean = f'../images/euclidean_{imname}.jpg'
-fname_ncc = f'../images/ncc_{imname}.jpg'
+fname_euclidean = f'../images/euclidean_{sys.argv[1]}.jpg'
+fname_ncc = f'../images/ncc_{sys.argv[1]}.jpg'
 skio.imsave(fname_euclidean, im_out_euclidean)
 skio.imsave(fname_ncc, im_out_ncc)
-skio.imshow(im_out_euclidean)
-skio.imshow(im_out_ncc)
-skio.show()
+# skio.imshow(im_out_euclidean)
+# skio.imshow(im_out_ncc)
+# skio.show()
