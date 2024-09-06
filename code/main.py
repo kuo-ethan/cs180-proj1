@@ -31,7 +31,7 @@ extension = {
 }
 
 # Validate command line inputs
-if len(sys.argv) < 2 or len(sys.arv) > 3:
+if len(sys.argv) < 2 or len(sys.argv) > 3:
     print("Error: You need to pass 1 or 2 arguments.")
     print("Usage: python3 main.py <image_name> [displacement_factor]")
     print("Example: python3 main.py cathedral.jpg 30")
@@ -41,8 +41,7 @@ if len(sys.argv) < 2 or len(sys.arv) > 3:
 curr_extension = extension[sys.argv[1]]
 imname = f'../data/{sys.argv[1]}.{curr_extension}'
 if len(sys.argv) == 2:
-    # Use default displacement search range
-    D = 16
+    D = 16 # Default displacement factor
 else:
     D = int(sys.argv[2])
 
@@ -59,9 +58,9 @@ r = im[2*height: 3*height]
 # Align the channels and create color images
 im_out = None
 if curr_extension == 'jpg':
-    im_out = naive_colorize(r, g, b, D)
+    im_out = naive_colorize(r, g, b, D) # Slow but precise
 else:
-    im_out = pyramid_colorize(r, g, b)
+    im_out = pyramid_colorize(r, g, b) # Fast but rough
 
 # Create, save, and display the color image
 fname_ncc = f'../images/ncc_{sys.argv[1]}.jpg'

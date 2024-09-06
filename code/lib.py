@@ -7,6 +7,11 @@ import numpy as np
 import cv2
 from skimage.transform import rescale
 
+# =============== Similarity metrics ==================
+
+def euclidean_distance(arr1, arr2):
+    return np.linalg.norm(arr1 - arr2)
+
 def normalized_cross_correlation(arr1, arr2):
     normalized1 = arr1 / np.linalg.norm(arr1)
     normalized2 = arr2 / np.linalg.norm(arr2)
@@ -27,8 +32,26 @@ def translate(im, tx, ty):
     ], dtype=np.float32)
     return cv2.warpAffine(im, mat, (w, h))
 
-# Returns the best displacement vector according to NCC on Canny edges.
-def align_exhaustive(image, base, D):
+# ================ ALGORITHMS ======================
+
+# Aligns channels using exhaustive search.
+def naive_colorize(r, g, b, D, similarity_metric=normalized_cross_correlation, score_fn=lambda a, b: a > b):
+    x, y = align_exhaustive(g, b, D, similarity_metric, score_fn)
+    ag = translate(g, x, y)
+    x, y = align_exhaustive(r, b, D, similarity_metric, score_fn)
+    ar = translate(r, x, y)
+    return np.dstack([ar, ag, b])
+
+# Aligns channels using image pyramid technique.
+def pyramid_colorize(r, g, b, D=2):
+    x, y = align_with_pyramid(g, b, D)
+    ag = translate(g, x, y)
+    x, y = align_with_pyramid(r, b, D)
+    ar = translate(r, x, y)
+    return np.dstack([ar, ag, b])
+
+# Finds the best displacement vector using exhaustive search.
+def align_exhaustive(image, base, D, similarity_metric, score_fn):
 
     # Apply Canny edge detection
     image_edges = cv2.Canny(image, 100, 155)
@@ -55,16 +78,15 @@ def align_exhaustive(image, base, D):
                 image_overlap = image_edges[-y:, -x:]
 
             # Compute alignment score based only on overlapping regions
-            curr_score = normalized_cross_correlation(base_overlap, image_overlap)
+            curr_score = similarity_metric(base_overlap, image_overlap)
 
-            if curr_score > best_score:
+            if score_fn(curr_score, best_score):
                 # print(f'{curr_score}: {x}, {y}')
                 best_score, best_x, best_y = curr_score, x, y
 
     return best_x, best_y
 
-# Returns the best displacement vector for image according to NCC.
-# Sped up using the image pyramid technique.
+# Finds the best displacement vector using image pyramid technique.
 def align_with_pyramid(image, base, D, levels=4):
 
     # Returns a pyramid for the image, from low to high resolution
@@ -92,75 +114,3 @@ def align_with_pyramid(image, base, D, levels=4):
 
     best_x, best_y = align_level(levels-1, D)
     return translate(image, best_x, best_y)
-    
-# Aligns channels using normalized cross correlation.
-def naive_colorize(r, g, b, D):
-    x, y = align_exhaustive(g, b, D)
-    ag = translate(g, x, y)
-    x, y = align_exhaustive(r, b, D)
-    ar = translate(r, x, y)
-    return np.dstack([ar, ag, b])
-
-# Same as naive_colorize, but uses image pyramid technique and is thus much faster.
-# Note that D is the displacement range used at the highest resolution image.
-def pyramid_colorize(r, g, b, D=2):
-    x, y = align_with_pyramid(g, b, D)
-    ag = translate(g, x, y)
-    x, y = align_with_pyramid(r, b, D)
-    ar = translate(r, x, y)
-    return np.dstack([ar, ag, b])
-
-
-
-
-
-
-
-
-
-
-
-# =============== UNUSED =================
-def colorize_with_euclidean(r, g, b, D):
-    ag = align_with_euclidean(g, b, D)
-    ar = align_with_euclidean(r, b, D)
-    return np.dstack([ar, ag, b])
-
-def align_with_euclidean(image, base, D):
-    # Apply Canny edge detection
-    image_edges = cv2.Canny(image, 100, 155)
-    base_edges = cv2.Canny(base, 100, 155)
-
-    # Find the best alignment vector
-    best_score = float('inf')
-    best_x, best_y = None, None
-    for x in range(-D, D+1):
-        for y in range(-D, D+1):
-            # Determine slices of overlap for image and base
-            base_overlap, image_overlap = None, None
-            if x >= 0 and y >= 0:
-                base_overlap = base_edges[(None if y == 0 else y):, (None if x == 0 else x):]
-                image_overlap = image_edges[:(None if y == 0 else -y), :(None if x == 0 else -x)]
-            elif x >= 0 and y < 0:
-                base_overlap = base_edges[:y, (None if x == 0 else x):]
-                image_overlap = image_edges[-y:, :(None if x == 0 else -x)]
-            elif x < 0 and y >= 0:
-                base_overlap = base_edges[(None if y == 0 else y):, :x]
-                image_overlap = image_edges[:(None if y == 0 else -y), -x:]
-            elif x < 0 and y < 0:
-                base_overlap = base_edges[:y, :x]
-                image_overlap = image_edges[-y:, -x:]
-
-            # Compute alignment score based only on overlapping regions
-            curr_score = euclidean_distance(base_overlap, image_overlap)
-            if curr_score < best_score:
-                best_score, best_x, best_y = curr_score, x, y
-
-    # Translate the image based on the displacement vector
-    print(best_x, best_y)
-    return translate(image, best_x, best_y)
-
-
-
-def euclidean_distance(arr1, arr2):
-    return np.linalg.norm(arr1 - arr2)
