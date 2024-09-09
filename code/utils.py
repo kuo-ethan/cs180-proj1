@@ -1,14 +1,13 @@
 # Utility functions here
-
-# functions that might be useful for aligning the images include:
-# np.roll, np.sum, sk.transform.rescale (for multiscale)
-
 import numpy as np
 import cv2
-from skimage.transform import rescale
+from skimage.transform import resize
+
+# =============== Parameters ==================
+CANNY_LOWER_THRESHOLD = 100
+CANNY_UPPER_THRESHOLD = 155
 
 # =============== Similarity metrics ==================
-
 def euclidean_distance(arr1, arr2):
     return np.linalg.norm(arr1 - arr2)
 
@@ -17,6 +16,7 @@ def normalized_cross_correlation(arr1, arr2):
     normalized2 = arr2 / np.linalg.norm(arr2)
     return np.sum(normalized1 * normalized2)
 
+# =============== Helpers ==================
 def translate(im, tx, ty):
     """
     translate an image `tx` to the right, `ty` down
@@ -33,35 +33,34 @@ def translate(im, tx, ty):
     return cv2.warpAffine(im, mat, (w, h))
 
 # ================ ALGORITHMS ======================
-
-# Aligns channels using exhaustive search.
-def naive_colorize(r, g, b, D, similarity_metric=normalized_cross_correlation, score_fn=lambda a, b: a > b):
-    x, y = align_exhaustive(g, b, D, similarity_metric, score_fn)
+# Colorizes channels using exhaustive search.
+def naive_colorize(r, g, b, D, similarity_metric=normalized_cross_correlation):
+    x, y = align_exhaustive(g, b, D, similarity_metric)
     ag = translate(g, x, y)
-    x, y = align_exhaustive(r, b, D, similarity_metric, score_fn)
+    x, y = align_exhaustive(r, b, D, similarity_metric)
     ar = translate(r, x, y)
     return np.dstack([ar, ag, b])
 
-# Aligns channels using image pyramid technique.
-def pyramid_colorize(r, g, b, D=2):
-    x, y = align_with_pyramid(g, b, D)
+# Colorizes channels using image pyramid search.
+def pyramid_colorize(r, g, b, D, similarity_metric=normalized_cross_correlation):
+    x, y = align_with_pyramid(g, b, D, similarity_metric)
     ag = translate(g, x, y)
-    x, y = align_with_pyramid(r, b, D)
+    x, y = align_with_pyramid(r, b, D, similarity_metric)
     ar = translate(r, x, y)
     return np.dstack([ar, ag, b])
 
 # Finds the best displacement vector using exhaustive search.
-def align_exhaustive(image, base, D, similarity_metric, score_fn):
+def align_exhaustive(image, base, D, similarity_metric, start_x=0, start_y=0):
 
     # Apply Canny edge detection
-    image_edges = cv2.Canny(image, 100, 155)
-    base_edges = cv2.Canny(base, 100, 155)
+    image_edges = cv2.Canny(image, CANNY_LOWER_THRESHOLD, CANNY_UPPER_THRESHOLD)
+    base_edges = cv2.Canny(base, CANNY_LOWER_THRESHOLD, CANNY_UPPER_THRESHOLD)
 
     # Find the best alignment vector on Canny edge images
     best_score = -float('inf')
     best_x, best_y = None, None
-    for x in range(-D, D+1):
-        for y in range(-D, D+1):
+    for x in range(start_x - D, start_x + D + 1):
+        for y in range(start_y - D, start_y + D + 1):
             # Determine slices of overlap for image and base
             base_overlap, image_overlap = None, None
             if x >= 0 and y >= 0:
@@ -80,37 +79,31 @@ def align_exhaustive(image, base, D, similarity_metric, score_fn):
             # Compute alignment score based only on overlapping regions
             curr_score = similarity_metric(base_overlap, image_overlap)
 
-            if score_fn(curr_score, best_score):
-                # print(f'{curr_score}: {x}, {y}')
+            if curr_score > best_score:
                 best_score, best_x, best_y = curr_score, x, y
-
     return best_x, best_y
 
 # Finds the best displacement vector using image pyramid technique.
-def align_with_pyramid(image, base, D, levels=4):
+def align_with_pyramid(image, base, D, similarity_metric, levels=4):
+    last_level = levels - 1
 
-    # Returns a pyramid for the image, from low to high resolution
+    # Returns a pyramid for the image, from high to low resolution.
     def build_pyramid(image, levels):
         pyramid = [image]
-        for i in range(levels-1):
-            downscaled_image = rescale(pyramid[i-1], 0.5, anti_aliasing=True, preserve_range=True)
-            pyramid.append(downscaled_image)
-        pyramid.reverse()
+        for i in range(1, levels):
+            im = pyramid[i-1] / 255
+            downscaled_image = resize(im, (im.shape[0] / 2, im.shape[1] / 2))
+            pyramid.append((downscaled_image * 255).astype(np.uint8))
         return pyramid
     
     image_pyramid = build_pyramid(image, levels)
     base_pyramid = build_pyramid(base, levels)
 
-    # Given a level in the pyramid, return the best displacement vector
-    def align_level(level, max_displacement):
-        if level == 0:
-            return align_exhaustive(image_pyramid[0], base_pyramid[0], max_displacement)
-        x, y = align_level(level-1, max_displacement * 2)
-        
-        # Scale up the displacement vector
-        # Update align_exhaustive to allow starting displacement
+    # Finds the best displacement vector for a level in the pyramid.
+    def align_level(level, d):
+        if level == last_level:
+            return align_exhaustive(image_pyramid[level], base_pyramid[level], d, similarity_metric)
+        prev_x, prev_y = align_level(level+1, d*2)
+        return align_exhaustive(image_pyramid[level], base_pyramid[level], d, similarity_metric, prev_x*2, prev_y*2)
 
-
-
-    best_x, best_y = align_level(levels-1, D)
-    return translate(image, best_x, best_y)
+    return align_level(0, D)
