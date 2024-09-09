@@ -81,6 +81,7 @@ def align_exhaustive(image, base, D, similarity_metric, start_x=0, start_y=0):
 
             if curr_score > best_score:
                 best_score, best_x, best_y = curr_score, x, y
+    print(best_x, best_y)
     return best_x, best_y
 
 # Finds the best displacement vector using image pyramid technique.
@@ -106,4 +107,6 @@ def align_with_pyramid(image, base, D, similarity_metric, levels=4):
         prev_x, prev_y = align_level(level+1, d*2)
         return align_exhaustive(image_pyramid[level], base_pyramid[level], d, similarity_metric, prev_x*2, prev_y*2)
 
-    return align_level(0, D)
+    best_x, best_y = align_level(0, D)
+    print(best_x, best_y)
+    return best_x, best_y

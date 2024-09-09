@@ -18,6 +18,11 @@ extensions = {
     'three_generations': 'tif',
     'tobolsk': 'jpg',
     'train': 'tif',
+    # Extra images
+    'adobe': 'tif',
+    'siren': 'tif',
+    'boy': 'tif',
+    'railroad': 'jpg',
 }
 
 # Given a file name and displacement factor, generate and safe the colorized image.
@@ -56,6 +61,7 @@ if len(sys.argv) < 2 or len(sys.argv) > 3:
 file = sys.argv[1]
 if file == 'ALL':
     for file, extension in extensions.items():
+        print(f'Displacements for {file}.{extension}:')
         if extension == 'jpg':
             colorize(file, 15)
         else:
